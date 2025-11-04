@@ -1,32 +1,45 @@
-import { neon } from "@neondatabase/serverless"
+import { Pool } from "pg"
 
-let sqlClient: ReturnType<typeof neon> | null = null
+let pool: Pool | null = null
 
 export function getDb() {
-  if (!sqlClient) {
-    const dbUrl = process.env.NEON_NEON_DATABASE_URL || process.env.DATABASE_URL
+  if (!pool) {
+    const dbUrl = process.env.NEON_DATABASE_URL || process.env.NEON_DATABASE_URL
     if (!dbUrl) {
       console.warn("[v0] DATABASE_URL not set, database operations will fail at runtime")
-      return new Proxy({} as ReturnType<typeof neon>, {
-        apply() {
-          throw new Error("DATABASE_URL environment variable is not set")
-        },
-      })
+      throw new Error("DATABASE_URL environment variable is not set")
     }
-    sqlClient = neon(dbUrl)
+
+    pool = new Pool({
+      connectionString: dbUrl,
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
+    })
+
+    console.log("[v0] PostgreSQL connection pool created")
   }
-  return sqlClient
+  return pool
 }
 
-// Export sql for direct usage
-export const sql = new Proxy({} as ReturnType<typeof neon>, {
-  get(target, prop) {
-    return getDb()[prop as keyof ReturnType<typeof neon>]
-  },
-  apply(target, thisArg, args) {
-    return getDb()(...(args as [any]))
-  },
-})
+export async function sql(strings: TemplateStringsArray, ...values: any[]) {
+  const db = getDb()
+
+  // Convert template string to parameterized query
+  let query = strings[0]
+  const params: any[] = []
+
+  for (let i = 0; i < values.length; i++) {
+    params.push(values[i])
+    query += `$${i + 1}` + strings[i + 1]
+  }
+
+  console.log("[v0] SQL Query:", query.substring(0, 100))
+  console.log("[v0] SQL Params:", params.length)
+
+  const result = await db.query(query, params)
+  return result.rows
+}
 
 export interface User {
   id: number

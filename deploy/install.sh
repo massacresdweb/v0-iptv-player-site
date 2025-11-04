@@ -96,11 +96,11 @@ cd "$APP_DIR"
 npm install
 
 # Build
-echo -e "${YELLOW}[9/10] Uygulama build ediliyor...${NC}"
+echo -e "${YELLOW}[10/10] Uygulama build ediliyor...${NC}"
 npm run build
 
 # PM2 kur
-echo -e "${YELLOW}[10/10] PM2 kuruluyor...${NC}"
+echo -e "${YELLOW}[11/12] PM2 kuruluyor...${NC}"
 npm install -g pm2
 
 # PM2 ile başlat
@@ -110,7 +110,7 @@ pm2 save
 pm2 startup
 
 # Nginx kur
-echo -e "${YELLOW}[11/12] Nginx kuruluyor...${NC}"
+echo -e "${YELLOW}[12/12] Nginx kuruluyor...${NC}"
 apt-get install -y nginx
 
 # Nginx config
@@ -139,7 +139,7 @@ nginx -t
 systemctl restart nginx
 
 # UFW Firewall
-echo -e "${YELLOW}[12/12] UFW Firewall yapılandırılıyor...${NC}"
+echo -e "${YELLOW}[13/13] UFW Firewall yapılandırılıyor...${NC}"
 ufw --force enable
 ufw allow 22/tcp
 ufw allow 80/tcp

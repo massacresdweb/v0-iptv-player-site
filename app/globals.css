@@ -4,7 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Updated to premium dark theme colors for IQ MASSTV */
+  /* Updated to premium dark theme colors for MASSTV */
   --background: oklch(0.09 0.01 264);
   --foreground: oklch(0.98 0 0);
   --card: oklch(0.12 0.01 264);

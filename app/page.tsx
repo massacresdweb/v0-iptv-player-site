@@ -88,7 +88,7 @@ export default function HomePage() {
           </div>
           <div>
             <CardTitle className="text-4xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400 bg-clip-text text-transparent animate-gradient">
-              IQ MASSTV
+              MASSTV
             </CardTitle>
             <p className="text-sm text-slate-500 mt-1 font-medium">Premium IPTV Platform</p>
           </div>

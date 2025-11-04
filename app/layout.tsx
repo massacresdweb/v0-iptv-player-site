@@ -9,7 +9,7 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "IQ MASSTV - Premium IPTV Platform",
+  title: "MASSTV - Premium IPTV Platform",
   description: "Ultra-secure, high-performance IPTV streaming platform",
   generator: "v0.app",
 }

@@ -255,7 +255,7 @@ export default function AdminPage() {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-              IQ MASSTV Admin
+              MASSTV Admin
             </h1>
             <p className="text-sm text-slate-400">Yönetim Paneli</p>
           </div>

@@ -1,4 +1,4 @@
--- IQ MASSTV - Complete Database Setup
+-- MASSTV - Complete Database Setup
 -- Run this script once to set up everything
 
 -- Admins table
