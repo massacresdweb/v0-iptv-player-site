@@ -1,26 +1,20 @@
-import { Redis } from "@upstash/redis"
+import { createClient } from "redis"
 
-let redisClient: Redis | null = null
+let redisClient: ReturnType<typeof createClient> | null = null
 
 export function getRedisClient() {
   if (!redisClient) {
-    const url = process.env.UPSTASH_KV_REST_API_URL || process.env.KV_REST_API_URL
-    const token = process.env.UPSTASH_KV_REST_API_TOKEN || process.env.KV_REST_API_TOKEN
+    const url = process.env.REDIS_URL || "redis://localhost:6379"
 
-    if (!url || !token) {
-      console.warn("[v0] Redis not configured, caching disabled")
-      return {
-        get: async () => null,
-        set: async () => "OK",
-        setex: async () => "OK",
-        del: async () => 0,
-        incr: async () => 1,
-        expire: async () => 1,
-        keys: async () => [],
-      } as any
-    }
+    redisClient = createClient({ url })
 
-    redisClient = new Redis({ url, token })
+    redisClient.on("error", (err) => {
+      console.error("[v0] Redis Client Error:", err)
+    })
+
+    redisClient.connect().catch((err) => {
+      console.error("[v0] Redis Connection Error:", err)
+    })
   }
 
   return redisClient
@@ -38,7 +32,7 @@ export const CACHE_KEYS = {
 export const CACHE_TTL = {
   ADMIN_SESSION: 3600, // 1 hour
   USER_KEY: 1800, // 30 minutes
-  M3U_CHANNELS: 3600, // 1 hour (aggressive caching)
+  M3U_CHANNELS: 3600, // 1 hour
   M3U_SOURCE: 1800, // 30 minutes
   RATE_LIMIT: 60, // 1 minute
 }
@@ -47,7 +41,7 @@ export async function getCached<T>(key: string): Promise<T | null> {
   try {
     const client = getRedisClient()
     const data = await client.get(key)
-    return data as T | null
+    return data ? JSON.parse(data) : null
   } catch (error) {
     console.error("[v0] Redis get error:", error)
     return null
@@ -57,7 +51,7 @@ export async function getCached<T>(key: string): Promise<T | null> {
 export async function setCached<T>(key: string, value: T, ttl: number): Promise<void> {
   try {
     const client = getRedisClient()
-    await client.setex(key, ttl, JSON.stringify(value))
+    await client.setEx(key, ttl, JSON.stringify(value))
   } catch (error) {
     console.error("[v0] Redis set error:", error)
   }
@@ -77,7 +71,7 @@ export async function deletePattern(pattern: string): Promise<void> {
     const client = getRedisClient()
     const keys = await client.keys(pattern)
     if (keys.length > 0) {
-      await client.del(...keys)
+      await client.del(keys)
     }
   } catch (error) {
     console.error("[v0] Redis delete pattern error:", error)
