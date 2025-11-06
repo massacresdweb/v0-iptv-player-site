@@ -2,7 +2,17 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ url: string[] }> }) {
   try {
-    const { url } = await params
+    console.log("[v0] Stream proxy called, params:", params)
+    const resolvedParams = await params
+    console.log("[v0] Resolved params:", resolvedParams)
+    console.log("[v0] URL array:", resolvedParams?.url)
+
+    if (!resolvedParams || !resolvedParams.url) {
+      console.error("[v0] Invalid params - url is undefined")
+      return new NextResponse("Invalid stream URL", { status: 400 })
+    }
+
+    const { url } = resolvedParams
 
     // Decode the stream URL from params
     const streamUrl = decodeURIComponent(url.join("/"))
