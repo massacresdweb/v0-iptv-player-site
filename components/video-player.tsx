@@ -29,12 +29,18 @@ export function VideoPlayer({ src, poster, onTimeUpdate }: VideoPlayerProps) {
 
   useEffect(() => {
     const video = videoRef.current
-    if (!video || !src) return
+    if (!video || !src) {
+      console.log("[v0] VideoPlayer: No video element or src", { video: !!video, src })
+      return
+    }
+
+    console.log("[v0] VideoPlayer: Loading stream", src)
 
     const loadHls = async () => {
       const Hls = (await import("hls.js")).default
 
       if (Hls.isSupported()) {
+        console.log("[v0] HLS.js is supported, initializing...")
         const hls = new Hls({
           enableWorker: true,
           lowLatencyMode: true,
@@ -54,10 +60,12 @@ export function VideoPlayer({ src, poster, onTimeUpdate }: VideoPlayerProps) {
         })
 
         hlsRef.current = hls
+        console.log("[v0] Loading HLS source:", src)
         hls.loadSource(src)
         hls.attachMedia(video)
 
         hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+          console.log("[v0] HLS manifest parsed, levels:", data.levels.length)
           const qualities = data.levels.map((level: any, index: number) => {
             if (level.height) return `${level.height}p`
             return `Level ${index}`
@@ -72,6 +80,7 @@ export function VideoPlayer({ src, poster, onTimeUpdate }: VideoPlayerProps) {
         hls.on(Hls.Events.FRAG_LOADED, () => setIsBuffering(false))
 
         hls.on(Hls.Events.ERROR, (event, data) => {
+          console.error("[v0] HLS error:", data.type, data.details, data.fatal)
           if (data.fatal) {
             switch (data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:
@@ -90,7 +99,10 @@ export function VideoPlayer({ src, poster, onTimeUpdate }: VideoPlayerProps) {
           }
         })
       } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        console.log("[v0] Native HLS support, using video.src")
         video.src = src
+      } else {
+        console.error("[v0] HLS not supported!")
       }
     }
 
@@ -98,6 +110,7 @@ export function VideoPlayer({ src, poster, onTimeUpdate }: VideoPlayerProps) {
 
     return () => {
       if (hlsRef.current) {
+        console.log("[v0] Destroying HLS instance")
         hlsRef.current.destroy()
       }
     }
