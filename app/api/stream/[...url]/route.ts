@@ -1,9 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-export async function GET(request: NextRequest, { params }: { params: { url: string[] } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ url: string[] }> }) {
   try {
+    const { url } = await params
+
     // Decode the stream URL from params
-    const streamUrl = decodeURIComponent(params.url.join("/"))
+    const streamUrl = decodeURIComponent(url.join("/"))
 
     console.log("[v0] Stream proxy request for:", streamUrl)
 
