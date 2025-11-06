@@ -1,56 +1,30 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { validateKey, createUserSession, getUserSession } from "@/lib/auth"
 import { checkRateLimit } from "@/lib/redis"
-import { sql } from "@/lib/db"
 
 export async function GET(request: NextRequest) {
   try {
-    console.log("[v0] validate-key GET API called (session check)")
+    console.log("[v0] validate-key GET called - checking session")
 
     const session = await getUserSession()
 
     if (!session) {
       console.log("[v0] No session found")
-      return NextResponse.json({ error: "No session" }, { status: 401 })
+      return NextResponse.json({ error: "Session bulunamadı" }, { status: 401 })
     }
 
-    console.log("[v0] Session found, validating key:", session.keyCode)
+    console.log("[v0] Session found, key_code:", session.key_code)
 
-    // Validate KEY from database
-    const keyResult = await sql`
-      SELECT key_code, m3u_source_id, expires_at, is_active, is_banned
-      FROM user_keys 
-      WHERE key_code = ${session.keyCode}
-    `
-
-    if (keyResult.length === 0) {
-      console.log("[v0] KEY not found in database")
-      return NextResponse.json({ error: "KEY not found" }, { status: 401 })
-    }
-
-    const key = keyResult[0]
-
-    if (key.is_banned || !key.is_active) {
-      console.log("[v0] KEY is banned or inactive")
-      return NextResponse.json({ error: "KEY is not valid" }, { status: 401 })
-    }
-
-    if (key.expires_at && new Date(key.expires_at as string) < new Date()) {
-      console.log("[v0] KEY expired")
-      return NextResponse.json({ error: "KEY expired" }, { status: 401 })
-    }
-
-    console.log("[v0] Session validated successfully")
-
+    // Return key info
     return NextResponse.json({
       success: true,
-      key: key.key_code,
-      expiresAt: key.expires_at,
-      m3uSourceId: key.m3u_source_id,
+      key: session.key_code,
+      expiresAt: session.expires_at,
+      m3uSourceId: session.m3u_source_id,
     })
   } catch (error) {
     console.error("[v0] Session check error:", error)
-    return NextResponse.json({ error: "Session check failed" }, { status: 500 })
+    return NextResponse.json({ error: "Session kontrolü başarısız" }, { status: 500 })
   }
 }
 

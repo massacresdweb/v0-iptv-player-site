@@ -54,14 +54,21 @@ export default function PlayerPage() {
 
   const checkSession = async () => {
     try {
+      console.log("[v0] Checking session...")
       const response = await fetch("/api/validate-key", { method: "GET" })
+
+      console.log("[v0] Session check response:", response.status)
+
       if (!response.ok) {
+        console.log("[v0] Session invalid, redirecting to home")
         router.push("/")
       } else {
         const data = await response.json()
+        console.log("[v0] Session valid, key:", data.key)
         setKeyInfo(data)
       }
     } catch (error) {
+      console.error("[v0] Session check failed:", error)
       router.push("/")
     }
   }
