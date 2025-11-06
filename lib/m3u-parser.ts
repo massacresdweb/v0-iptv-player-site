@@ -93,10 +93,15 @@ export async function parseM3U(content: string, maxChannels = 5000): Promise<Cha
       }
     } else if (line && !line.startsWith("#") && currentChannel.name) {
       // This is the stream URL
-      const url = line.trim()
+      let url = line.trim()
 
       // Detect channel type
       const type = detectChannelType(currentChannel.name, currentChannel.group || "", url)
+
+      if (type === "live" && !url.match(/\.(m3u8|ts|mp4|mkv|avi|flv)$/i)) {
+        url = `${url}.m3u8`
+        console.log("[v0] Added .m3u8 extension to live stream URL")
+      }
 
       const channel: Channel = {
         id: randomUUID(),

@@ -24,10 +24,7 @@ function rewriteM3U8Urls(content: string, baseUrl: string): string {
       if (trimmedLine.startsWith("http://") || trimmedLine.startsWith("https://")) {
         absoluteUrl = trimmedLine
       } else {
-        // It's a relative URL - make it absolute
-        const baseUrlObj = new URL(baseUrl)
-        const basePath = baseUrlObj.pathname.substring(0, baseUrlObj.pathname.lastIndexOf("/") + 1)
-        absoluteUrl = `${baseUrlObj.origin}${basePath}${trimmedLine}`
+        absoluteUrl = new URL(trimmedLine, baseUrl).href
       }
 
       // Convert to proxy URL
@@ -43,11 +40,11 @@ function rewriteM3U8Urls(content: string, baseUrl: string): string {
   return rewrittenLines.join("\n")
 }
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+export async function GET(request: NextRequest, { params }: { params: { path: string[] } }) {
   try {
     console.log("[v0] === STREAM PROXY REQUEST ===")
 
-    const { path } = await params
+    const { path } = params
     console.log("[v0] Path array:", path)
 
     if (!path || path.length === 0) {
