@@ -1,158 +1,121 @@
 "use client"
 
 import { useRef, useEffect, useState } from "react"
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Settings } from "lucide-react"
+import { Play, Pause, Volume2, VolumeX, Maximize, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Slider } from "@/components/ui/slider"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 interface VideoPlayerProps {
   src: string
   poster?: string
-  onTimeUpdate?: (currentTime: number) => void
 }
 
-export function VideoPlayer({ src, poster, onTimeUpdate }: VideoPlayerProps) {
+export function VideoPlayer({ src, poster }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const hlsRef = useRef<any>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
-  const [volume, setVolume] = useState(100)
-  const [isFullscreen, setIsFullscreen] = useState(false)
-  const [showControls, setShowControls] = useState(true)
-  const [currentTime, setCurrentTime] = useState(0)
-  const [duration, setDuration] = useState(0)
-  const [quality, setQuality] = useState<string>("auto")
-  const [availableQualities, setAvailableQualities] = useState<string[]>([])
-  const [isBuffering, setIsBuffering] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const hlsRef = useRef<any>(null)
 
   useEffect(() => {
     const video = videoRef.current
     if (!video || !src) {
-      console.log("[v0] VideoPlayer: No video element or src", { video: !!video, src })
+      console.log("[v0] VideoPlayer: Missing video element or src")
       return
     }
 
-    console.log("[v0] === VIDEO PLAYER LOADING ===")
+    console.log("[v0] ========== VIDEO PLAYER INIT ==========")
     console.log("[v0] Stream URL:", src)
-    setError(null)
-    setIsBuffering(true)
 
-    const loadHls = async () => {
+    setIsLoading(true)
+    setError(null)
+
+    const initPlayer = async () => {
       try {
-        console.log("[v0] Importing HLS.js...")
-        const Hls = (await import("hls.js")).default
-        console.log("[v0] HLS.js imported successfully")
+        // Check if HLS.js is supported
+        const HlsModule = await import("hls.js")
+        const Hls = HlsModule.default
+
+        console.log("[v0] HLS.js loaded successfully")
 
         if (Hls.isSupported()) {
           console.log("[v0] HLS.js is supported, initializing...")
 
+          // Destroy previous instance
           if (hlsRef.current) {
             console.log("[v0] Destroying previous HLS instance")
             hlsRef.current.destroy()
           }
 
           const hls = new Hls({
+            debug: false,
             enableWorker: true,
-            lowLatencyMode: true,
+            lowLatencyMode: false,
             backBufferLength: 90,
-            maxBufferLength: 30,
-            maxMaxBufferLength: 600,
-            maxBufferSize: 60 * 1000 * 1000,
-            maxBufferHole: 0.5,
-            startLevel: -1,
-            autoStartLoad: true,
-            manifestLoadingTimeOut: 10000,
-            manifestLoadingMaxRetry: 4,
-            levelLoadingTimeOut: 10000,
-            levelLoadingMaxRetry: 4,
-            fragLoadingTimeOut: 20000,
-            fragLoadingMaxRetry: 6,
-            xhrSetup: (xhr: XMLHttpRequest, url: string) => {
-              xhr.withCredentials = false
-            },
           })
 
           hlsRef.current = hls
 
-          console.log("[v0] Loading HLS source:", src)
+          console.log("[v0] Loading source:", src)
           hls.loadSource(src)
           hls.attachMedia(video)
 
-          hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
-            console.log("[v0] ✅ HLS manifest parsed successfully!")
-            console.log("[v0] Available levels:", data.levels.length)
-
-            const qualities = data.levels.map((level: any, index: number) => {
-              if (level.height) return `${level.height}p`
-              return `Level ${index}`
-            })
-            setAvailableQualities(["auto", ...qualities])
-            setIsBuffering(false)
-
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            console.log("[v0] ✅ Manifest parsed, starting playback")
+            setIsLoading(false)
             video.play().catch((err) => {
-              console.error("[v0] Auto-play failed:", err)
+              console.log("[v0] Autoplay blocked:", err.message)
+              setIsPlaying(false)
             })
           })
 
-          hls.on(Hls.Events.BUFFER_APPENDING, () => setIsBuffering(false))
-          hls.on(Hls.Events.BUFFER_APPENDED, () => setIsBuffering(false))
-          hls.on(Hls.Events.FRAG_LOADING, () => setIsBuffering(true))
-          hls.on(Hls.Events.FRAG_LOADED, () => setIsBuffering(false))
-
           hls.on(Hls.Events.ERROR, (event, data) => {
-            console.error("[v0] ❌ HLS error:", {
-              type: data.type,
-              details: data.details,
-              fatal: data.fatal,
-              error: data.error,
-            })
+            console.error("[v0] ❌ HLS Error:", data.type, data.details)
 
             if (data.fatal) {
-              setIsBuffering(false)
+              setIsLoading(false)
               switch (data.type) {
                 case Hls.ErrorTypes.NETWORK_ERROR:
-                  console.log("[v0] Network error, attempting recovery...")
+                  console.log("[v0] Network error, retrying...")
                   setError("Ağ hatası, yeniden deneniyor...")
-                  hls.startLoad()
+                  setTimeout(() => hls.startLoad(), 1000)
                   break
                 case Hls.ErrorTypes.MEDIA_ERROR:
-                  console.log("[v0] Media error, attempting recovery...")
-                  setError("Medya hatası, yeniden deneniyor...")
+                  console.log("[v0] Media error, recovering...")
+                  setError("Medya hatası, düzeltiliyor...")
                   hls.recoverMediaError()
                   break
                 default:
-                  console.error("[v0] Fatal error, destroying HLS instance")
-                  setError("Yayın yüklenemedi. Lütfen başka bir kanal deneyin.")
-                  hls.destroy()
+                  console.error("[v0] Fatal error, cannot recover")
+                  setError("Yayın yüklenemedi")
                   break
               }
             }
           })
         } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-          console.log("[v0] Native HLS support detected, using video.src")
+          console.log("[v0] Native HLS support detected")
           video.src = src
-          setIsBuffering(false)
+          setIsLoading(false)
         } else {
-          console.error("[v0] ❌ HLS not supported on this browser!")
+          console.error("[v0] ❌ HLS not supported")
           setError("Bu tarayıcı HLS desteklemiyor")
-          setIsBuffering(false)
+          setIsLoading(false)
         }
       } catch (err) {
-        console.error("[v0] ❌ Failed to load HLS.js:", err)
-        setError("Video player yüklenemedi")
-        setIsBuffering(false)
+        console.error("[v0] ❌ Failed to initialize player:", err)
+        setError("Video player başlatılamadı")
+        setIsLoading(false)
       }
     }
 
-    loadHls()
+    initPlayer()
 
     return () => {
       if (hlsRef.current) {
         console.log("[v0] Cleaning up HLS instance")
         hlsRef.current.destroy()
+        hlsRef.current = null
       }
     }
   }, [src])
@@ -161,70 +124,36 @@ export function VideoPlayer({ src, poster, onTimeUpdate }: VideoPlayerProps) {
     const video = videoRef.current
     if (!video) return
 
-    if (isPlaying) {
-      video.pause()
-    } else {
+    if (video.paused) {
       video.play()
+      setIsPlaying(true)
+    } else {
+      video.pause()
+      setIsPlaying(false)
     }
-    setIsPlaying(!isPlaying)
   }
 
   const toggleMute = () => {
     const video = videoRef.current
     if (!video) return
 
-    video.muted = !isMuted
-    setIsMuted(!isMuted)
-  }
-
-  const handleVolumeChange = (value: number[]) => {
-    const video = videoRef.current
-    if (!video) return
-
-    const newVolume = value[0]
-    video.volume = newVolume / 100
-    setVolume(newVolume)
-    setIsMuted(newVolume === 0)
+    video.muted = !video.muted
+    setIsMuted(video.muted)
   }
 
   const toggleFullscreen = () => {
     const container = containerRef.current
     if (!container) return
 
-    if (!isFullscreen) {
+    if (!document.fullscreenElement) {
       container.requestFullscreen()
     } else {
       document.exitFullscreen()
     }
-    setIsFullscreen(!isFullscreen)
-  }
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = Math.floor(seconds % 60)
-    return `${mins}:${secs.toString().padStart(2, "0")}`
-  }
-
-  const changeQuality = (qualityIndex: string) => {
-    if (!hlsRef.current) return
-
-    if (qualityIndex === "auto") {
-      hlsRef.current.currentLevel = -1
-      setQuality("auto")
-    } else {
-      const index = availableQualities.indexOf(qualityIndex) - 1
-      hlsRef.current.currentLevel = index
-      setQuality(qualityIndex)
-    }
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="relative w-full aspect-video bg-black rounded-lg overflow-hidden group shadow-2xl"
-      onMouseEnter={() => setShowControls(true)}
-      onMouseLeave={() => setShowControls(false)}
-    >
+    <div ref={containerRef} className="relative w-full aspect-video bg-black rounded-lg overflow-hidden shadow-2xl">
       <video
         ref={videoRef}
         poster={poster}
@@ -232,19 +161,21 @@ export function VideoPlayer({ src, poster, onTimeUpdate }: VideoPlayerProps) {
         onClick={togglePlay}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
-        onTimeUpdate={() => {
-          if (videoRef.current) {
-            setCurrentTime(videoRef.current.currentTime)
-            onTimeUpdate?.(videoRef.current.currentTime)
-          }
-        }}
-        onLoadedMetadata={() => {
-          if (videoRef.current) {
-            setDuration(videoRef.current.duration)
-          }
-        }}
+        onWaiting={() => setIsLoading(true)}
+        onPlaying={() => setIsLoading(false)}
       />
 
+      {/* Loading Overlay */}
+      {isLoading && !error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/70">
+          <div className="text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-blue-500 mx-auto mb-2" />
+            <p className="text-white text-sm">Yükleniyor...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error Overlay */}
       {error && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/80">
           <div className="text-center p-6">
@@ -254,101 +185,22 @@ export function VideoPlayer({ src, poster, onTimeUpdate }: VideoPlayerProps) {
         </div>
       )}
 
-      {isBuffering && !error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mx-auto mb-4" />
-            <p className="text-white">Yükleniyor...</p>
-          </div>
-        </div>
-      )}
-
-      {/* Controls Overlay */}
-      <div
-        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-6 transition-opacity duration-300 ${
-          showControls ? "opacity-100" : "opacity-0"
-        }`}
-      >
-        {/* Progress Bar */}
-        <div className="mb-4">
-          <Slider
-            value={[currentTime]}
-            max={duration || 100}
-            step={0.1}
-            onValueChange={(value) => {
-              const video = videoRef.current
-              if (video) {
-                video.currentTime = value[0]
-                setCurrentTime(value[0])
-              }
-            }}
-            className="cursor-pointer"
-          />
-          <div className="flex justify-between text-xs text-white mt-1">
-            <span>{formatTime(currentTime)}</span>
-            <span>{formatTime(duration)}</span>
-          </div>
-        </div>
-
-        {/* Control Buttons */}
+      {/* Controls */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={togglePlay} className="text-white hover:bg-white/20 h-10 w-10">
-              {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
-            </Button>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleMute}
-                className="text-white hover:bg-white/20 h-10 w-10"
-              >
-                {isMuted ? <VolumeX className="h-6 w-6" /> : <Volume2 className="h-6 w-6" />}
-              </Button>
-              <div className="w-24">
-                <Slider
-                  value={[volume]}
-                  max={100}
-                  step={1}
-                  onValueChange={handleVolumeChange}
-                  className="cursor-pointer"
-                />
-              </div>
-            </div>
-          </div>
-
           <div className="flex items-center gap-2">
-            {availableQualities.length > 1 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="text-white hover:bg-white/20 h-10 w-10">
-                    <Settings className="h-5 w-5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-slate-900 border-slate-700">
-                  {availableQualities.map((q) => (
-                    <DropdownMenuItem
-                      key={q}
-                      onClick={() => changeQuality(q)}
-                      className={`text-white hover:bg-slate-800 ${quality === q ? "bg-slate-800" : ""}`}
-                    >
-                      {q}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+            <Button variant="ghost" size="icon" onClick={togglePlay} className="text-white hover:bg-white/20">
+              {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+            </Button>
 
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleFullscreen}
-              className="text-white hover:bg-white/20 h-10 w-10"
-            >
-              {isFullscreen ? <Minimize className="h-6 w-6" /> : <Maximize className="h-6 w-6" />}
+            <Button variant="ghost" size="icon" onClick={toggleMute} className="text-white hover:bg-white/20">
+              {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
             </Button>
           </div>
+
+          <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="text-white hover:bg-white/20">
+            <Maximize className="h-5 w-5" />
+          </Button>
         </div>
       </div>
     </div>
