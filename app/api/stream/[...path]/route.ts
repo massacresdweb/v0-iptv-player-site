@@ -53,9 +53,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const urlObj = new URL(streamUrl)
     const baseUrl = `${urlObj.protocol}//${urlObj.host}`
-    const referer = streamUrl.endsWith(".ts")
-      ? `${baseUrl}${urlObj.pathname.substring(0, urlObj.pathname.lastIndexOf("/"))}`
-      : streamUrl
+
+    const referer = baseUrl
 
     const userAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)]
     console.log("[v0] Using User-Agent:", userAgent)
