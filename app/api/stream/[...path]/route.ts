@@ -76,22 +76,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const realUrl = decrypt(encryptedUrl)
 
-    const streamPath = path.join("/")
-    let streamUrl = realUrl.includes("?") ? `${realUrl}&path=${streamPath}` : `${realUrl}/${streamPath}`
-
-    const servers = await getCache("servers:active")
-    if (servers && Array.isArray(servers) && servers.length > 0) {
-      // Round-robin load balancing
-      const serverIndex = Math.floor(Math.random() * servers.length)
-      const server = servers[serverIndex]
-      streamUrl = streamUrl.replace(new URL(realUrl).origin, server.url)
+    if (!path || path.length === 0) {
+      console.error("[v0] Stream proxy: No path provided")
+      return new NextResponse("No stream URL provided", { status: 400 })
     }
 
-    const streamCacheKey = `stream:${streamPath}`
-    const cached = streamCache.get(streamCacheKey)
-    if (cached && Date.now() - cached.timestamp < 5000) {
-      return cached.response.clone()
-    }
+    const streamUrl = decodeURIComponent(path.join("/"))
+
+    console.log("[v0] Stream proxy: Fetching stream from:", streamUrl)
 
     const userAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)]
 
@@ -100,36 +92,29 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         "User-Agent": userAgent,
         Accept: "*/*",
         Connection: "keep-alive",
-        "X-Forwarded-For": "127.0.0.1",
-        "X-Real-IP": "127.0.0.1",
       },
+      // @ts-ignore - keepalive is valid but TypeScript doesn't recognize it
       keepalive: true,
     })
 
     if (!streamResponse.ok) {
-      return new NextResponse("Stream error", { status: 502 })
+      console.error("[v0] Stream proxy: Stream fetch failed:", streamResponse.status)
+      return new NextResponse("Stream not available", { status: 502 })
     }
 
     const response = new NextResponse(streamResponse.body, {
       status: 200,
       headers: {
         "Content-Type": streamResponse.headers.get("Content-Type") || "application/vnd.apple.mpegurl",
-        "Cache-Control": "public, max-age=10",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
         "Access-Control-Allow-Origin": "*",
         "X-Content-Type-Options": "nosniff",
       },
     })
 
-    streamCache.set(streamCacheKey, { response: response.clone(), timestamp: Date.now() })
-
-    if (streamCache.size > 100) {
-      const oldestKey = Array.from(streamCache.entries()).sort((a, b) => a[1].timestamp - b[1].timestamp)[0][0]
-      streamCache.delete(oldestKey)
-    }
-
     return response
   } catch (error) {
     console.error("[v0] Stream proxy error:", error)
-    return new NextResponse("Internal error", { status: 500 })
+    return new NextResponse("Internal server error", { status: 500 })
   }
 }
