@@ -6,6 +6,8 @@ import { fetchAndParseM3U, type Channel } from "@/lib/m3u-parser"
 import { fetchXtreamChannels, type XtreamCredentials } from "@/lib/xtream-parser"
 import { decryptM3U } from "@/lib/encryption"
 
+const MAX_CHANNELS = 5000
+
 export async function GET(request: NextRequest) {
   try {
     console.log("[v0] Channels API called")
@@ -67,7 +69,11 @@ export async function GET(request: NextRequest) {
 
     if (channels) {
       console.log("[v0] Channels loaded from cache:", channels.length)
-      return NextResponse.json({ channels, cached: true })
+      if (channels.length > MAX_CHANNELS) {
+        console.log("[v0] Cached channels exceed limit, truncating to", MAX_CHANNELS)
+        channels = channels.slice(0, MAX_CHANNELS)
+      }
+      return NextResponse.json({ channels, cached: true, total: channels.length })
     }
 
     console.log("[v0] Fetching M3U source from database...")
@@ -114,12 +120,17 @@ export async function GET(request: NextRequest) {
     if (isXtream) {
       const credentials: XtreamCredentials = JSON.parse(decryptedContent)
       console.log("[v0] Fetching channels from Xtream API...")
-      channels = await fetchXtreamChannels(credentials)
+      channels = await fetchXtreamChannels(credentials, MAX_CHANNELS)
       console.log("[v0] Xtream channels fetched:", channels.length)
     } else {
       console.log("[v0] Fetching channels from M3U URL...")
-      channels = await fetchAndParseM3U(decryptedContent)
+      channels = await fetchAndParseM3U(decryptedContent, MAX_CHANNELS)
       console.log("[v0] M3U channels fetched:", channels.length)
+    }
+
+    if (channels.length > MAX_CHANNELS) {
+      console.log("[v0] Channels exceed limit, truncating from", channels.length, "to", MAX_CHANNELS)
+      channels = channels.slice(0, MAX_CHANNELS)
     }
 
     const mappedChannels = channels.map((ch) => ({
@@ -129,23 +140,21 @@ export async function GET(request: NextRequest) {
       logo: ch.logo,
       group: ch.group,
       epgId: ch.epgId,
-      category: ch.type || "live", // Ensure category is always set
+      category: ch.type || "live",
       type: ch.type,
-      is_favorite: false, // Default to false, will be updated by user
+      is_favorite: false,
     }))
 
-    console.log("[v0] === CHANNEL MAPPING DEBUG ===")
+    console.log("[v0] === CHANNEL STATS ===")
     console.log("[v0] Total channels:", mappedChannels.length)
-    console.log("[v0] Sample channel (first):", JSON.stringify(mappedChannels[0], null, 2))
-    console.log("[v0] Live channels:", mappedChannels.filter((ch) => ch.category === "live").length)
-    console.log("[v0] Movie channels:", mappedChannels.filter((ch) => ch.category === "movie").length)
-    console.log("[v0] Series channels:", mappedChannels.filter((ch) => ch.category === "series").length)
-    console.log("[v0] Channels without category:", mappedChannels.filter((ch) => !ch.category).length)
+    console.log("[v0] Live:", mappedChannels.filter((ch) => ch.category === "live").length)
+    console.log("[v0] Movies:", mappedChannels.filter((ch) => ch.category === "movie").length)
+    console.log("[v0] Series:", mappedChannels.filter((ch) => ch.category === "series").length)
 
     // Cache for 1 hour
     await setCached(channelsCacheKey, mappedChannels, CACHE_TTL.CHANNELS)
 
-    return NextResponse.json({ channels: mappedChannels, cached: false })
+    return NextResponse.json({ channels: mappedChannels, cached: false, total: mappedChannels.length })
   } catch (error) {
     console.error("[v0] Channels API error:", error)
     return NextResponse.json(

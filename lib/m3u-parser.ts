@@ -62,7 +62,7 @@ function detectChannelType(name: string, group: string, url: string): "live" | "
 /**
  * Parse M3U content and extract channels
  */
-export async function parseM3U(content: string, maxChannels = 10000): Promise<Channel[]> {
+export async function parseM3U(content: string, maxChannels = 5000): Promise<Channel[]> {
   console.log("[v0] Parsing M3U content, length:", content.length, "max channels:", maxChannels)
 
   const channels: Channel[] = []
@@ -148,7 +148,7 @@ export function analyzeM3U(channels: Channel[]): M3UStats {
 /**
  * Fetch M3U from URL and parse it
  */
-export async function fetchAndParseM3U(url: string, maxChannels = 10000): Promise<Channel[]> {
+export async function fetchAndParseM3U(url: string, maxChannels = 5000): Promise<Channel[]> {
   console.log("[v0] Fetching M3U from URL:", url.substring(0, 50) + "...", "max channels:", maxChannels)
 
   const controller = new AbortController()

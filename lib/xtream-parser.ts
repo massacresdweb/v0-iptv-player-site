@@ -52,7 +52,7 @@ export async function validateXtreamCredentials(credentials: XtreamCredentials):
 /**
  * Fetch all Xtream content and convert to Channel format
  */
-export async function fetchXtreamChannels(credentials: XtreamCredentials, maxChannels = 10000): Promise<Channel[]> {
+export async function fetchXtreamChannels(credentials: XtreamCredentials, maxChannels = 5000): Promise<Channel[]> {
   const { server, username, password, port = 80 } = credentials
   const baseUrl = `${server}:${port}`
 
@@ -99,6 +99,7 @@ export async function fetchXtreamChannels(credentials: XtreamCredentials, maxCha
           epgId: stream.epg_channel_id || undefined,
         })
       })
+      console.log("[v0] Added live channels:", channels.length)
     }
 
     // Process VOD (movies)
@@ -118,6 +119,7 @@ export async function fetchXtreamChannels(credentials: XtreamCredentials, maxCha
           type: "movie",
         })
       })
+      console.log("[v0] Added VOD channels, total:", channels.length)
     }
 
     // Process series
@@ -137,6 +139,7 @@ export async function fetchXtreamChannels(credentials: XtreamCredentials, maxCha
           type: "series",
         })
       })
+      console.log("[v0] Added series, total:", channels.length)
     }
 
     console.log("[v0] Total Xtream channels (limited):", channels.length)
