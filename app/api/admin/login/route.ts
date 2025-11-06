@@ -55,7 +55,13 @@ export async function POST(request: NextRequest) {
     await createAdminSession(admin)
     console.log("[v0] Admin session created successfully")
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({
+      success: true,
+      admin: {
+        id: admin.id,
+        username: admin.username,
+      },
+    })
   } catch (error) {
     console.error("[v0] Admin login error:", error)
     return NextResponse.json({ error: "Giriş başarısız: " + (error as Error).message }, { status: 500 })
@@ -67,10 +73,12 @@ export async function GET() {
     const admin = await getAdminSession()
 
     if (!admin) {
+      console.log("[v0] No admin session found")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    return NextResponse.json({ success: true, admin: { id: admin.id, username: admin.username } })
+    console.log("[v0] Admin session valid:", admin.username)
+    return NextResponse.json({ success: true, admin: { id: admin.adminId, username: admin.username } })
   } catch (error) {
     console.error("[v0] Admin session check error:", error)
     return NextResponse.json({ error: "Session check failed" }, { status: 500 })

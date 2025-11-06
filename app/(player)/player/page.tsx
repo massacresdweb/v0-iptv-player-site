@@ -68,14 +68,30 @@ export default function PlayerPage() {
 
   const fetchChannels = async () => {
     try {
+      console.log("[v0] Fetching channels from API...")
       const response = await fetch("/api/channels")
+
       if (response.ok) {
         const data = await response.json()
-        setChannels(data.channels || [])
-        if (data.channels && data.channels.length > 0) {
-          setSelectedChannel(data.channels[0])
+        console.log("[v0] === PLAYER RECEIVED DATA ===")
+        console.log("[v0] Total channels received:", data.channels?.length || 0)
+        console.log("[v0] First channel:", JSON.stringify(data.channels?.[0], null, 2))
+        console.log("[v0] Cached:", data.cached)
+
+        if (data.channels && Array.isArray(data.channels) && data.channels.length > 0) {
+          setChannels(data.channels)
+
+          const firstLive = data.channels.find((ch: Channel) => !ch.category || ch.category === "live")
+          setSelectedChannel(firstLive || data.channels[0])
+
+          console.log("[v0] Channels set successfully, count:", data.channels.length)
+          console.log("[v0] Selected channel:", firstLive?.name || data.channels[0]?.name)
+        } else {
+          console.error("[v0] No channels in response or invalid format")
+          toast.error("Kanal listesi boş")
         }
       } else {
+        console.error("[v0] Channels API returned error:", response.status)
         toast.error("Kanallar yüklenemedi")
       }
     } catch (error) {
@@ -171,30 +187,78 @@ export default function PlayerPage() {
             </TabsList>
 
             <TabsContent value="live" className="flex-1 overflow-hidden mt-0">
-              <ChannelList
-                channels={channels.filter((ch) => !ch.category || ch.category === "live")}
-                selectedChannel={selectedChannel}
-                onSelectChannel={setSelectedChannel}
-                onToggleFavorite={handleToggleFavorite}
-              />
+              {(() => {
+                const liveChannels = channels.filter((ch) => !ch.category || ch.category === "live")
+                console.log("[v0] === LIVE TAB FILTER ===")
+                console.log("[v0] Total channels:", channels.length)
+                console.log("[v0] Live channels filtered:", liveChannels.length)
+                console.log("[v0] Sample live channel:", liveChannels[0]?.name)
+
+                if (liveChannels.length === 0) {
+                  return (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-slate-400">Canlı kanal bulunamadı</p>
+                    </div>
+                  )
+                }
+
+                return (
+                  <ChannelList
+                    channels={liveChannels}
+                    selectedChannel={selectedChannel}
+                    onSelectChannel={setSelectedChannel}
+                    onToggleFavorite={handleToggleFavorite}
+                  />
+                )
+              })()}
             </TabsContent>
 
             <TabsContent value="movies" className="flex-1 overflow-hidden mt-0">
-              <ChannelList
-                channels={channels.filter((ch) => ch.category === "movie")}
-                selectedChannel={selectedChannel}
-                onSelectChannel={setSelectedChannel}
-                onToggleFavorite={handleToggleFavorite}
-              />
+              {(() => {
+                const movieChannels = channels.filter((ch) => ch.category === "movie")
+                console.log("[v0] Movie channels filtered:", movieChannels.length)
+
+                if (movieChannels.length === 0) {
+                  return (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-slate-400">Film bulunamadı</p>
+                    </div>
+                  )
+                }
+
+                return (
+                  <ChannelList
+                    channels={movieChannels}
+                    selectedChannel={selectedChannel}
+                    onSelectChannel={setSelectedChannel}
+                    onToggleFavorite={handleToggleFavorite}
+                  />
+                )
+              })()}
             </TabsContent>
 
             <TabsContent value="series" className="flex-1 overflow-hidden mt-0">
-              <ChannelList
-                channels={channels.filter((ch) => ch.category === "series")}
-                selectedChannel={selectedChannel}
-                onSelectChannel={setSelectedChannel}
-                onToggleFavorite={handleToggleFavorite}
-              />
+              {(() => {
+                const seriesChannels = channels.filter((ch) => ch.category === "series")
+                console.log("[v0] Series channels filtered:", seriesChannels.length)
+
+                if (seriesChannels.length === 0) {
+                  return (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-slate-400">Dizi bulunamadı</p>
+                    </div>
+                  )
+                }
+
+                return (
+                  <ChannelList
+                    channels={seriesChannels}
+                    selectedChannel={selectedChannel}
+                    onSelectChannel={setSelectedChannel}
+                    onToggleFavorite={handleToggleFavorite}
+                  />
+                )
+              })()}
             </TabsContent>
           </Tabs>
         </aside>

@@ -29,7 +29,7 @@ export default function HomePage() {
       const response = await fetch("/api/validate-key", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: key.trim() }),
+        body: JSON.stringify({ keyCode: key.trim() }),
       })
 
       const data = await response.json()

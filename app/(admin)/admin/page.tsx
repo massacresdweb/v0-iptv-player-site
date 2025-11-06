@@ -21,8 +21,15 @@ export default function AdminPage() {
   const [servers, setServers] = useState<any[]>([])
   const [newKeyDuration, setNewKeyDuration] = useState("7")
   const [selectedM3U, setSelectedM3U] = useState("")
+
+  const [sourceType, setSourceType] = useState<"m3u" | "xtream">("m3u")
   const [newM3UName, setNewM3UName] = useState("")
   const [newM3UUrl, setNewM3UUrl] = useState("")
+  const [xtreamServer, setXtreamServer] = useState("")
+  const [xtreamUsername, setXtreamUsername] = useState("")
+  const [xtreamPassword, setXtreamPassword] = useState("")
+  const [xtreamPort, setXtreamPort] = useState("80")
+
   const [newServerName, setNewServerName] = useState("")
   const [newServerUrl, setNewServerUrl] = useState("")
   const [newServerLocation, setNewServerLocation] = useState("")
@@ -147,26 +154,74 @@ export default function AdminPage() {
   }
 
   const addM3USource = async () => {
-    if (!newM3UName || !newM3UUrl) {
-      toast.error("Tüm alanları doldurun")
+    if (!newM3UName) {
+      toast.error("Kaynak adı gerekli")
       return
     }
 
+    if (sourceType === "m3u" && !newM3UUrl) {
+      toast.error("M3U URL gerekli")
+      return
+    }
+
+    if (sourceType === "xtream" && (!xtreamServer || !xtreamUsername || !xtreamPassword)) {
+      toast.error("Xtream Codes için tüm alanları doldurun")
+      return
+    }
+
+    const loadingToast = toast.loading(
+      sourceType === "xtream" ? "Xtream Codes kaynağı ekleniyor..." : "M3U kaynağı ekleniyor...",
+    )
+
     try {
+      const requestBody =
+        sourceType === "xtream"
+          ? {
+              name: newM3UName,
+              sourceType: "xtream",
+              xtreamServer,
+              xtreamUsername,
+              xtreamPassword,
+              xtreamPort: Number.parseInt(xtreamPort) || 80,
+            }
+          : {
+              name: newM3UName,
+              sourceType: "m3u",
+              url: newM3UUrl,
+            }
+
+      console.log("[v0] Adding source:", {
+        ...requestBody,
+        xtreamPassword: requestBody.xtreamPassword ? "***" : undefined,
+      })
+
       const response = await fetch("/api/admin/m3u", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newM3UName, url: newM3UUrl }),
+        body: JSON.stringify(requestBody),
+        credentials: "include",
       })
 
+      const data = await response.json()
+      console.log("[v0] Source add response:", { ok: response.ok, status: response.status, data })
+
       if (response.ok) {
-        toast.success("M3U kaynağı eklendi")
+        toast.success("Kaynak başarıyla eklendi", { id: loadingToast })
         setNewM3UName("")
         setNewM3UUrl("")
+        setXtreamServer("")
+        setXtreamUsername("")
+        setXtreamPassword("")
+        setXtreamPort("80")
         fetchM3USources()
+      } else {
+        toast.error(data.error || "Kaynak eklenemedi", { id: loadingToast })
       }
     } catch (error) {
-      toast.error("Ekleme başarısız")
+      console.error("[v0] Source add error:", error)
+      toast.error("Bağlantı hatası: " + (error instanceof Error ? error.message : "Bilinmeyen hata"), {
+        id: loadingToast,
+      })
     }
   }
 
@@ -395,45 +450,89 @@ export default function AdminPage() {
           <TabsContent value="m3u" className="space-y-6">
             <Card className="bg-slate-900 border-slate-800">
               <CardHeader>
-                <CardTitle className="text-white">Yeni M3U Kaynağı Ekle</CardTitle>
+                <CardTitle className="text-white">Yeni Kaynak Ekle</CardTitle>
                 <CardDescription className="text-slate-400">
-                  M3U URL eklendiğinde otomatik olarak analiz edilir
+                  M3U URL veya Xtream Codes ile playlist ekleyin
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Input
-                    placeholder="Kaynak Adı"
-                    value={newM3UName}
-                    onChange={(e) => setNewM3UName(e.target.value)}
-                    className="bg-slate-800 border-slate-700 text-white"
-                  />
-                  <Input
-                    placeholder="M3U URL"
-                    value={newM3UUrl}
-                    onChange={(e) => setNewM3UUrl(e.target.value)}
-                    className="bg-slate-800 border-slate-700 text-white"
-                  />
-                  <Button onClick={addM3USource} className="bg-blue-600 hover:bg-blue-700">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Ekle ve Analiz Et
-                  </Button>
-                </div>
+                <Tabs value={sourceType} onValueChange={(v) => setSourceType(v as "m3u" | "xtream")}>
+                  <TabsList className="grid w-full grid-cols-2 bg-slate-800">
+                    <TabsTrigger value="m3u">M3U URL</TabsTrigger>
+                    <TabsTrigger value="xtream">Xtream Codes</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="m3u" className="space-y-4 mt-4">
+                    <Input
+                      placeholder="Kaynak Adı"
+                      value={newM3UName}
+                      onChange={(e) => setNewM3UName(e.target.value)}
+                      className="bg-slate-800 border-slate-700 text-white"
+                    />
+                    <Input
+                      placeholder="M3U URL (http://...)"
+                      value={newM3UUrl}
+                      onChange={(e) => setNewM3UUrl(e.target.value)}
+                      className="bg-slate-800 border-slate-700 text-white"
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="xtream" className="space-y-4 mt-4">
+                    <Input
+                      placeholder="Kaynak Adı"
+                      value={newM3UName}
+                      onChange={(e) => setNewM3UName(e.target.value)}
+                      className="bg-slate-800 border-slate-700 text-white"
+                    />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Input
+                        placeholder="Server (http://domain.com)"
+                        value={xtreamServer}
+                        onChange={(e) => setXtreamServer(e.target.value)}
+                        className="bg-slate-800 border-slate-700 text-white"
+                      />
+                      <Input
+                        placeholder="Port (varsayılan: 80)"
+                        value={xtreamPort}
+                        onChange={(e) => setXtreamPort(e.target.value)}
+                        className="bg-slate-800 border-slate-700 text-white"
+                      />
+                      <Input
+                        placeholder="Kullanıcı Adı"
+                        value={xtreamUsername}
+                        onChange={(e) => setXtreamUsername(e.target.value)}
+                        className="bg-slate-800 border-slate-700 text-white"
+                      />
+                      <Input
+                        type="password"
+                        placeholder="Şifre"
+                        value={xtreamPassword}
+                        onChange={(e) => setXtreamPassword(e.target.value)}
+                        className="bg-slate-800 border-slate-700 text-white"
+                      />
+                    </div>
+                  </TabsContent>
+                </Tabs>
+                {/* </CHANGE> */}
+
+                <Button onClick={addM3USource} className="w-full bg-blue-600 hover:bg-blue-700">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ekle ve Analiz Et
+                </Button>
               </CardContent>
             </Card>
 
             <Card className="bg-slate-900 border-slate-800">
               <CardHeader>
-                <CardTitle className="text-white">M3U Kaynakları ({m3uSources.length})</CardTitle>
-                <CardDescription className="text-slate-400">
-                  Her kaynak için kanal, film ve dizi sayıları gösterilir
-                </CardDescription>
+                <CardTitle className="text-white">Kaynaklar ({m3uSources.length})</CardTitle>
+                <CardDescription className="text-slate-400">M3U ve Xtream Codes kaynakları</CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow className="border-slate-800">
                       <TableHead className="text-slate-400">Kaynak Adı</TableHead>
+                      <TableHead className="text-slate-400">Tip</TableHead>
                       <TableHead className="text-slate-400">Canlı TV</TableHead>
                       <TableHead className="text-slate-400">Filmler</TableHead>
                       <TableHead className="text-slate-400">Diziler</TableHead>
@@ -443,29 +542,39 @@ export default function AdminPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {m3uSources.map((source) => (
-                      <TableRow key={source.id} className="border-slate-800">
-                        <TableCell className="text-white font-medium">{source.name}</TableCell>
-                        <TableCell className="text-blue-400">
-                          {source.stats ? `${source.stats.liveChannels} kanal` : "Analiz ediliyor..."}
-                        </TableCell>
-                        <TableCell className="text-purple-400">
-                          {source.stats ? `${source.stats.movies} film` : "-"}
-                        </TableCell>
-                        <TableCell className="text-green-400">
-                          {source.stats ? `${source.stats.series} dizi` : "-"}
-                        </TableCell>
-                        <TableCell className="text-white font-bold">
-                          {source.stats ? source.stats.totalChannels : "-"}
-                        </TableCell>
-                        <TableCell className="text-slate-400">
-                          {new Date(source.created_at).toLocaleDateString("tr-TR")}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className="bg-green-600">Aktif</Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {m3uSources.map((source) => {
+                      const calculatedTotal = source.stats
+                        ? source.stats.liveChannels + source.stats.movies + source.stats.series
+                        : 0
+                      const displayTotal = source.stats?.totalChannels || calculatedTotal
+
+                      return (
+                        <TableRow key={source.id} className="border-slate-800">
+                          <TableCell className="text-white font-medium">{source.name}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="border-blue-500 text-blue-400">
+                              {source.source_type === "xtream" ? "Xtream" : "M3U"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-blue-400">
+                            {source.stats ? `${source.stats.liveChannels} kanal` : "Analiz ediliyor..."}
+                          </TableCell>
+                          <TableCell className="text-purple-400">
+                            {source.stats ? `${source.stats.movies} film` : "-"}
+                          </TableCell>
+                          <TableCell className="text-green-400">
+                            {source.stats ? `${source.stats.series} dizi` : "-"}
+                          </TableCell>
+                          <TableCell className="text-white font-bold">{source.stats ? displayTotal : "-"}</TableCell>
+                          <TableCell className="text-slate-400">
+                            {new Date(source.created_at).toLocaleDateString("tr-TR")}
+                          </TableCell>
+                          <TableCell>
+                            <Badge className="bg-green-600">Aktif</Badge>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>

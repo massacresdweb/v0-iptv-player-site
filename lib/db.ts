@@ -4,7 +4,7 @@ let pool: Pool | null = null
 
 export function getDb() {
   if (!pool) {
-    const dbUrl = process.env.NEON_DATABASE_URL || process.env.NEON_DATABASE_URL
+    const dbUrl = process.env.NEON_NEON_DATABASE_URL || process.env.NEON_DATABASE_URL
     if (!dbUrl) {
       console.warn("[v0] DATABASE_URL not set, database operations will fail at runtime")
       throw new Error("DATABASE_URL environment variable is not set")
@@ -25,20 +25,27 @@ export function getDb() {
 export async function sql(strings: TemplateStringsArray, ...values: any[]) {
   const db = getDb()
 
-  // Convert template string to parameterized query
-  let query = strings[0]
-  const params: any[] = []
-
-  for (let i = 0; i < values.length; i++) {
-    params.push(values[i])
-    query += `$${i + 1}` + strings[i + 1]
+  // Build query text with placeholders
+  let text = ""
+  for (let i = 0; i < strings.length; i++) {
+    text += strings[i]
+    if (i < values.length) {
+      text += `$${i + 1}`
+    }
   }
 
-  console.log("[v0] SQL Query:", query.substring(0, 100))
-  console.log("[v0] SQL Params:", params.length)
+  console.log("[v0] SQL Query:", text.substring(0, 100))
+  console.log("[v0] SQL Params:", values.length)
 
-  const result = await db.query(query, params)
-  return result.rows
+  try {
+    const result = await db.query({ text, values })
+    return result.rows
+  } catch (error) {
+    console.error("[v0] SQL Error:", error)
+    console.error("[v0] Query:", text)
+    console.error("[v0] Values:", values)
+    throw error
+  }
 }
 
 export interface User {

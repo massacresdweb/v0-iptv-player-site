@@ -4,7 +4,10 @@ import { checkRateLimit } from "@/lib/redis"
 
 export async function POST(request: NextRequest) {
   try {
+    console.log("[v0] validate-key API called")
+
     const { keyCode } = await request.json()
+    console.log("[v0] Received keyCode:", keyCode ? "YES" : "NO")
 
     if (!keyCode) {
       return NextResponse.json({ error: "KEY gerekli" }, { status: 400 })
@@ -18,13 +21,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Çok fazla deneme. Lütfen bekleyin." }, { status: 429 })
     }
 
+    console.log("[v0] Validating key:", keyCode.toUpperCase())
     const key = await validateKey(keyCode.toUpperCase())
 
     if (!key) {
+      console.log("[v0] Key validation failed: invalid or expired")
       return NextResponse.json({ error: "Geçersiz veya süresi dolmuş KEY" }, { status: 401 })
     }
 
+    console.log("[v0] Key validated successfully:", key.key_code)
+    console.log("[v0] Creating user session...")
+
     const sessionToken = await createUserSession(key.key_code, key.m3u_source_id)
+
+    console.log("[v0] User session created, token:", sessionToken)
+    console.log("[v0] Cookie should be set now")
 
     return NextResponse.json({
       success: true,

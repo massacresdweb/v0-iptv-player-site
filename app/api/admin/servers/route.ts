@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getDb } from "@/lib/db"
+import { sql } from "@/lib/db"
 import { verifyAdminToken } from "@/lib/auth"
 
 export async function GET(request: NextRequest) {
@@ -9,8 +9,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const db = await getDb()
-    const servers = await db`
+    const servers = await sql`
       SELECT id, name, url, location, is_active, created_at
       FROM servers
       ORDER BY created_at DESC
@@ -36,8 +35,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Name and URL required" }, { status: 400 })
     }
 
-    const db = await getDb()
-    const result = await db`
+    const result = await sql`
       INSERT INTO servers (name, url, location, is_active)
       VALUES (${name}, ${url}, ${location || "Unknown"}, true)
       RETURNING id, name, url, location
@@ -64,8 +62,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Server ID required" }, { status: 400 })
     }
 
-    const db = await getDb()
-    await db`DELETE FROM servers WHERE id = ${serverId}`
+    await sql`DELETE FROM servers WHERE id = ${serverId}`
 
     return NextResponse.json({ success: true })
   } catch (error) {

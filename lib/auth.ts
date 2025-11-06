@@ -37,7 +37,7 @@ export async function createAdminSession(admin: Admin): Promise<string> {
   const token = await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("1h")
+    .setExpirationTime("24h")
     .sign(JWT_SECRET)
 
   await setCached(CACHE_KEYS.ADMIN_SESSION(token), payload, CACHE_TTL.ADMIN_SESSION)
@@ -45,30 +45,39 @@ export async function createAdminSession(admin: Admin): Promise<string> {
   const cookieStore = await cookies()
   cookieStore.set("admin_session", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    maxAge: 3600,
+    secure: false, // Allow HTTP for development/testing
+    sameSite: "lax", // Changed from "strict" to "lax" for better compatibility
+    maxAge: 86400, // 24 hours instead of 1 hour
     path: "/",
   })
+
+  console.log("[v0] Admin session cookie set successfully")
 
   return token
 }
 
 export async function getAdminSession(): Promise<AdminSessionPayload | null> {
-  const cookieStore = await cookies()
-  const token = cookieStore.get("admin_session")?.value
-
-  if (!token) return null
-
-  const cached = await getCached<AdminSessionPayload>(CACHE_KEYS.ADMIN_SESSION(token))
-  if (cached) return cached
-
   try {
+    const cookieStore = await cookies()
+    const token = cookieStore.get("admin_session")?.value
+
+    console.log("[v0] Checking admin session, token exists:", !!token)
+
+    if (!token) return null
+
+    const cached = await getCached<AdminSessionPayload>(CACHE_KEYS.ADMIN_SESSION(token))
+    if (cached) {
+      console.log("[v0] Admin session found in cache")
+      return cached
+    }
+
     const { payload } = await jwtVerify(token, JWT_SECRET)
     const session = payload as AdminSessionPayload
     await setCached(CACHE_KEYS.ADMIN_SESSION(token), session, CACHE_TTL.ADMIN_SESSION)
+    console.log("[v0] Admin session verified from JWT")
     return session
-  } catch {
+  } catch (error) {
+    console.error("[v0] Admin session verification failed:", error)
     return null
   }
 }
@@ -122,11 +131,13 @@ export async function createUserSession(keyCode: string, m3uSourceId: number): P
   const cookieStore = await cookies()
   cookieStore.set("user_session", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: false, // Allow HTTP for development/testing
     sameSite: "lax",
     maxAge: 86400,
     path: "/",
   })
+
+  console.log("[v0] User session cookie set successfully")
 
   return sessionToken
 }
@@ -135,12 +146,19 @@ export async function getUserSession(): Promise<UserSessionPayload | null> {
   const cookieStore = await cookies()
   const token = cookieStore.get("user_session")?.value
 
-  if (!token) return null
+  console.log("[v0] getUserSession called, token exists:", !!token)
+
+  if (!token) {
+    console.log("[v0] No session token found in cookies")
+    return null
+  }
 
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET)
+    console.log("[v0] Session verified successfully, keyCode:", (payload as UserSessionPayload).keyCode)
     return payload as UserSessionPayload
-  } catch {
+  } catch (error) {
+    console.error("[v0] Session verification failed:", error)
     return null
   }
 }

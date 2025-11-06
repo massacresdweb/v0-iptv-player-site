@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getDb } from "@/lib/db"
+import { sql } from "@/lib/db"
 import { getCache, setCache } from "@/lib/redis"
 import { decrypt } from "@/lib/encryption"
 
@@ -24,17 +24,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     let session = await getCache(cacheKey)
 
     if (!session) {
-      const db = await getDb()
-      const result = await db.execute(
-        "SELECT * FROM active_sessions WHERE session_token = ? AND expires_at > NOW() AND is_active = true",
-        [sessionToken],
-      )
+      const result = await sql`
+        SELECT * FROM active_sessions 
+        WHERE session_token = ${sessionToken} 
+        AND expires_at > NOW() 
+        AND is_active = true
+      `
 
-      if (result.rows.length === 0) {
+      if (result.length === 0) {
         return new NextResponse("Invalid session", { status: 401 })
       }
 
-      session = result.rows[0]
+      session = result[0]
       await setCache(cacheKey, session, 300)
     }
 
@@ -42,10 +43,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     let isBanned = await getCache(banCacheKey)
 
     if (isBanned === null) {
-      const keyResult = await (await getDb()).execute("SELECT is_banned FROM user_keys WHERE key_value = ?", [
-        session.key_value,
-      ])
-      isBanned = keyResult.rows[0]?.is_banned || false
+      const keyResult = await sql`
+        SELECT is_banned 
+        FROM user_keys 
+        WHERE key_value = ${session.key_value}
+      `
+      isBanned = keyResult[0]?.is_banned || false
       await setCache(banCacheKey, isBanned, 60)
     }
 
@@ -57,15 +60,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     let encryptedUrl = await getCache(m3uCacheKey)
 
     if (!encryptedUrl) {
-      const m3uResult = await (await getDb()).execute("SELECT encrypted_url FROM m3u_sources WHERE id = ?", [
-        session.m3u_source_id,
-      ])
+      const m3uResult = await sql`
+        SELECT encrypted_url 
+        FROM m3u_sources 
+        WHERE id = ${session.m3u_source_id}
+      `
 
-      if (m3uResult.rows.length === 0) {
+      if (m3uResult.length === 0) {
         return new NextResponse("M3U not found", { status: 404 })
       }
 
-      encryptedUrl = m3uResult.rows[0].encrypted_url as string
+      encryptedUrl = m3uResult[0].encrypted_url as string
       await setCache(m3uCacheKey, encryptedUrl, 600)
     }
 
