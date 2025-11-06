@@ -26,6 +26,7 @@ export function VideoPlayer({ src, poster, onTimeUpdate }: VideoPlayerProps) {
   const [quality, setQuality] = useState<string>("auto")
   const [availableQualities, setAvailableQualities] = useState<string[]>([])
   const [isBuffering, setIsBuffering] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const video = videoRef.current
@@ -34,75 +35,115 @@ export function VideoPlayer({ src, poster, onTimeUpdate }: VideoPlayerProps) {
       return
     }
 
-    console.log("[v0] VideoPlayer: Loading stream", src)
+    console.log("[v0] === VIDEO PLAYER LOADING ===")
+    console.log("[v0] Stream URL:", src)
+    setError(null)
+    setIsBuffering(true)
 
     const loadHls = async () => {
-      const Hls = (await import("hls.js")).default
+      try {
+        console.log("[v0] Importing HLS.js...")
+        const Hls = (await import("hls.js")).default
+        console.log("[v0] HLS.js imported successfully")
 
-      if (Hls.isSupported()) {
-        console.log("[v0] HLS.js is supported, initializing...")
-        const hls = new Hls({
-          enableWorker: true,
-          lowLatencyMode: true,
-          backBufferLength: 90,
-          maxBufferLength: 30,
-          maxMaxBufferLength: 600,
-          maxBufferSize: 60 * 1000 * 1000,
-          maxBufferHole: 0.5,
-          startLevel: -1,
-          autoStartLoad: true,
-          manifestLoadingTimeOut: 10000,
-          manifestLoadingMaxRetry: 4,
-          levelLoadingTimeOut: 10000,
-          levelLoadingMaxRetry: 4,
-          fragLoadingTimeOut: 20000,
-          fragLoadingMaxRetry: 6,
-        })
+        if (Hls.isSupported()) {
+          console.log("[v0] HLS.js is supported, initializing...")
 
-        hlsRef.current = hls
-        console.log("[v0] Loading HLS source:", src)
-        hls.loadSource(src)
-        hls.attachMedia(video)
-
-        hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
-          console.log("[v0] HLS manifest parsed, levels:", data.levels.length)
-          const qualities = data.levels.map((level: any, index: number) => {
-            if (level.height) return `${level.height}p`
-            return `Level ${index}`
-          })
-          setAvailableQualities(["auto", ...qualities])
-          video.play().catch(() => {})
-        })
-
-        hls.on(Hls.Events.BUFFER_APPENDING, () => setIsBuffering(false))
-        hls.on(Hls.Events.BUFFER_APPENDED, () => setIsBuffering(false))
-        hls.on(Hls.Events.FRAG_LOADING, () => setIsBuffering(true))
-        hls.on(Hls.Events.FRAG_LOADED, () => setIsBuffering(false))
-
-        hls.on(Hls.Events.ERROR, (event, data) => {
-          console.error("[v0] HLS error:", data.type, data.details, data.fatal)
-          if (data.fatal) {
-            switch (data.type) {
-              case Hls.ErrorTypes.NETWORK_ERROR:
-                console.log("[v0] Network error, attempting recovery...")
-                hls.startLoad()
-                break
-              case Hls.ErrorTypes.MEDIA_ERROR:
-                console.log("[v0] Media error, attempting recovery...")
-                hls.recoverMediaError()
-                break
-              default:
-                console.error("[v0] Fatal error, destroying HLS instance")
-                hls.destroy()
-                break
-            }
+          if (hlsRef.current) {
+            console.log("[v0] Destroying previous HLS instance")
+            hlsRef.current.destroy()
           }
-        })
-      } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        console.log("[v0] Native HLS support, using video.src")
-        video.src = src
-      } else {
-        console.error("[v0] HLS not supported!")
+
+          const hls = new Hls({
+            enableWorker: true,
+            lowLatencyMode: true,
+            backBufferLength: 90,
+            maxBufferLength: 30,
+            maxMaxBufferLength: 600,
+            maxBufferSize: 60 * 1000 * 1000,
+            maxBufferHole: 0.5,
+            startLevel: -1,
+            autoStartLoad: true,
+            manifestLoadingTimeOut: 10000,
+            manifestLoadingMaxRetry: 4,
+            levelLoadingTimeOut: 10000,
+            levelLoadingMaxRetry: 4,
+            fragLoadingTimeOut: 20000,
+            fragLoadingMaxRetry: 6,
+            xhrSetup: (xhr: XMLHttpRequest, url: string) => {
+              xhr.withCredentials = false
+            },
+          })
+
+          hlsRef.current = hls
+
+          console.log("[v0] Loading HLS source:", src)
+          hls.loadSource(src)
+          hls.attachMedia(video)
+
+          hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+            console.log("[v0] ✅ HLS manifest parsed successfully!")
+            console.log("[v0] Available levels:", data.levels.length)
+
+            const qualities = data.levels.map((level: any, index: number) => {
+              if (level.height) return `${level.height}p`
+              return `Level ${index}`
+            })
+            setAvailableQualities(["auto", ...qualities])
+            setIsBuffering(false)
+
+            video.play().catch((err) => {
+              console.error("[v0] Auto-play failed:", err)
+            })
+          })
+
+          hls.on(Hls.Events.BUFFER_APPENDING, () => setIsBuffering(false))
+          hls.on(Hls.Events.BUFFER_APPENDED, () => setIsBuffering(false))
+          hls.on(Hls.Events.FRAG_LOADING, () => setIsBuffering(true))
+          hls.on(Hls.Events.FRAG_LOADED, () => setIsBuffering(false))
+
+          hls.on(Hls.Events.ERROR, (event, data) => {
+            console.error("[v0] ❌ HLS error:", {
+              type: data.type,
+              details: data.details,
+              fatal: data.fatal,
+              error: data.error,
+            })
+
+            if (data.fatal) {
+              setIsBuffering(false)
+              switch (data.type) {
+                case Hls.ErrorTypes.NETWORK_ERROR:
+                  console.log("[v0] Network error, attempting recovery...")
+                  setError("Ağ hatası, yeniden deneniyor...")
+                  hls.startLoad()
+                  break
+                case Hls.ErrorTypes.MEDIA_ERROR:
+                  console.log("[v0] Media error, attempting recovery...")
+                  setError("Medya hatası, yeniden deneniyor...")
+                  hls.recoverMediaError()
+                  break
+                default:
+                  console.error("[v0] Fatal error, destroying HLS instance")
+                  setError("Yayın yüklenemedi. Lütfen başka bir kanal deneyin.")
+                  hls.destroy()
+                  break
+              }
+            }
+          })
+        } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+          console.log("[v0] Native HLS support detected, using video.src")
+          video.src = src
+          setIsBuffering(false)
+        } else {
+          console.error("[v0] ❌ HLS not supported on this browser!")
+          setError("Bu tarayıcı HLS desteklemiyor")
+          setIsBuffering(false)
+        }
+      } catch (err) {
+        console.error("[v0] ❌ Failed to load HLS.js:", err)
+        setError("Video player yüklenemedi")
+        setIsBuffering(false)
       }
     }
 
@@ -110,7 +151,7 @@ export function VideoPlayer({ src, poster, onTimeUpdate }: VideoPlayerProps) {
 
     return () => {
       if (hlsRef.current) {
-        console.log("[v0] Destroying HLS instance")
+        console.log("[v0] Cleaning up HLS instance")
         hlsRef.current.destroy()
       }
     }
@@ -204,9 +245,21 @@ export function VideoPlayer({ src, poster, onTimeUpdate }: VideoPlayerProps) {
         }}
       />
 
-      {isBuffering && (
+      {error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+          <div className="text-center p-6">
+            <p className="text-red-400 text-lg mb-2">⚠️ Hata</p>
+            <p className="text-white">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {isBuffering && !error && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500" />
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mx-auto mb-4" />
+            <p className="text-white">Yükleniyor...</p>
+          </div>
         </div>
       )}
 
