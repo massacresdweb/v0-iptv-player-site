@@ -94,7 +94,7 @@ export async function fetchXtreamChannels(credentials: XtreamCredentials, maxCha
           name: stream.name || "Unknown",
           logo: stream.stream_icon || undefined,
           group: stream.category_name || "Live TV",
-          url: `${baseUrl}/live/${username}/${password}/${stream.stream_id}.ts`,
+          url: `${baseUrl}/live/${username}/${password}/${stream.stream_id}.m3u8`,
           type: "live",
           epgId: stream.epg_channel_id || undefined,
         })
@@ -115,7 +115,7 @@ export async function fetchXtreamChannels(credentials: XtreamCredentials, maxCha
           name: stream.name || "Unknown",
           logo: stream.stream_icon || undefined,
           group: stream.category_name || "Movies",
-          url: `${baseUrl}/movie/${username}/${password}/${stream.stream_id}.mp4`,
+          url: `${baseUrl}/movie/${username}/${password}/${stream.stream_id}.${stream.container_extension || "mp4"}`,
           type: "movie",
         })
       })
@@ -135,7 +135,7 @@ export async function fetchXtreamChannels(credentials: XtreamCredentials, maxCha
           name: series.name || "Unknown",
           logo: series.cover || undefined,
           group: series.category_name || "Series",
-          url: `${baseUrl}/series/${username}/${password}/${series.series_id}.mp4`,
+          url: `${baseUrl}/series/${username}/${password}/${series.series_id}.${series.container_extension || "mp4"}`,
           type: "series",
         })
       })
