@@ -11,23 +11,12 @@ function rewriteM3U8Urls(content: string, baseUrl: string): string {
   const rewrittenLines = lines.map((line) => {
     const trimmedLine = line.trim()
 
-    // Skip comments, empty lines, and lines starting with #
     if (!trimmedLine || trimmedLine.startsWith("#")) {
       return line
     }
 
-    // This is a URL line - rewrite it
     try {
-      let absoluteUrl: string
-
-      // Check if it's already an absolute URL
-      if (trimmedLine.startsWith("http://") || trimmedLine.startsWith("https://")) {
-        absoluteUrl = trimmedLine
-      } else {
-        absoluteUrl = new URL(trimmedLine, baseUrl).href
-      }
-
-      // Convert to proxy URL
+      const absoluteUrl = new URL(trimmedLine, baseUrl).href
       const proxyUrl = `/api/stream/${encodeURIComponent(absoluteUrl)}`
       console.log("[v0] Rewritten URL:", trimmedLine, "->", proxyUrl)
       return proxyUrl
@@ -40,11 +29,13 @@ function rewriteM3U8Urls(content: string, baseUrl: string): string {
   return rewrittenLines.join("\n")
 }
 
-export async function GET(request: NextRequest, { params }: { params: { path: string[] } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   try {
     console.log("[v0] === STREAM PROXY REQUEST ===")
 
-    const { path } = params
+    const resolvedParams = await params
+    const { path } = resolvedParams
+
     console.log("[v0] Path array:", path)
 
     if (!path || path.length === 0) {
