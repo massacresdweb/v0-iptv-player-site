@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
     console.log("[v0] Using M3U source ID:", m3uSourceId)
 
     // Check cache
-    const channelsCacheKey = CACHE_KEYS.CHANNELS(m3uSourceId)
+    const channelsCacheKey = `${CACHE_KEYS.CHANNELS(m3uSourceId)}:v2`
     let channels = await getCached<Channel[]>(channelsCacheKey)
 
     if (channels) {
