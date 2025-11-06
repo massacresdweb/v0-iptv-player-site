@@ -6,6 +6,43 @@ const USER_AGENTS = [
   "Kodi/20.0 (Windows NT 10.0; Win64; x64)",
 ]
 
+function rewriteM3U8Urls(content: string, baseUrl: string): string {
+  const lines = content.split("\n")
+  const rewrittenLines = lines.map((line) => {
+    const trimmedLine = line.trim()
+
+    // Skip comments, empty lines, and lines starting with #
+    if (!trimmedLine || trimmedLine.startsWith("#")) {
+      return line
+    }
+
+    // This is a URL line - rewrite it
+    try {
+      let absoluteUrl: string
+
+      // Check if it's already an absolute URL
+      if (trimmedLine.startsWith("http://") || trimmedLine.startsWith("https://")) {
+        absoluteUrl = trimmedLine
+      } else {
+        // It's a relative URL - make it absolute
+        const baseUrlObj = new URL(baseUrl)
+        const basePath = baseUrlObj.pathname.substring(0, baseUrlObj.pathname.lastIndexOf("/") + 1)
+        absoluteUrl = `${baseUrlObj.origin}${basePath}${trimmedLine}`
+      }
+
+      // Convert to proxy URL
+      const proxyUrl = `/api/stream/${encodeURIComponent(absoluteUrl)}`
+      console.log("[v0] Rewritten URL:", trimmedLine, "->", proxyUrl)
+      return proxyUrl
+    } catch (error) {
+      console.error("[v0] Failed to rewrite URL:", trimmedLine, error)
+      return line
+    }
+  })
+
+  return rewrittenLines.join("\n")
+}
+
 export async function GET(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   try {
     console.log("[v0] === STREAM PROXY REQUEST ===")
@@ -37,19 +74,43 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         Connection: "keep-alive",
         Range: request.headers.get("Range") || "",
       },
-      signal: AbortSignal.timeout(30000), // 30 second timeout
+      signal: AbortSignal.timeout(30000),
     })
 
     console.log("[v0] Stream response status:", streamResponse.status)
-    console.log("[v0] Stream content-type:", streamResponse.headers.get("Content-Type"))
+    const contentType = streamResponse.headers.get("Content-Type") || ""
+    console.log("[v0] Stream content-type:", contentType)
 
     if (!streamResponse.ok) {
       console.error("[v0] Stream fetch failed:", streamResponse.status, streamResponse.statusText)
       return new NextResponse(`Stream not available: ${streamResponse.statusText}`, { status: 502 })
     }
 
+    const isM3U8 =
+      contentType.includes("application/vnd.apple.mpegurl") ||
+      contentType.includes("application/x-mpegURL") ||
+      contentType.includes("audio/mpegurl") ||
+      streamUrl.endsWith(".m3u8")
+
+    if (isM3U8) {
+      console.log("[v0] Detected M3U8 playlist - rewriting URLs...")
+      const m3u8Content = await streamResponse.text()
+      const rewrittenContent = rewriteM3U8Urls(m3u8Content, streamUrl)
+
+      return new NextResponse(rewrittenContent, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/vnd.apple.mpegurl",
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, OPTIONS",
+          "Access-Control-Allow-Headers": "*",
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+        },
+      })
+    }
+
     const headers = new Headers()
-    headers.set("Content-Type", streamResponse.headers.get("Content-Type") || "application/vnd.apple.mpegurl")
+    headers.set("Content-Type", contentType || "video/mp2t")
     headers.set("Access-Control-Allow-Origin", "*")
     headers.set("Access-Control-Allow-Methods", "GET, OPTIONS")
     headers.set("Access-Control-Allow-Headers", "*")
