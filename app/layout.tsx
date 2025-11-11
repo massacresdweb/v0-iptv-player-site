@@ -1,17 +1,14 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
-import { Analytics } from "@vercel/analytics/next"
-import { Toaster } from "sonner"
 import "./globals.css"
 
-const _geist = Geist({ subsets: ["latin"] })
-const _geistMono = Geist_Mono({ subsets: ["latin"] })
-
 export const metadata: Metadata = {
-  title: "MASSTV - Premium IPTV Platform",
+  title: "MassTV - Premium Streaming Platform",
   description: "Ultra-secure, high-performance IPTV streaming platform",
-  generator: "v0.app",
+  generator: "MassTV",
+  icons: {
+    icon: "/icon.svg",
+  },
 }
 
 export default function RootLayout({
@@ -20,11 +17,14 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="tr" className="dark">
-      <body className={`font-sans antialiased`}>
+    <html lang="en" className="dark">
+      <body className="font-sans antialiased">
+        <div className="floating-orb w-[500px] h-[500px] bg-primary top-[10%] left-[5%]" />
+        <div
+          className="floating-orb w-[400px] h-[400px] bg-accent top-[60%] right-[10%]"
+          style={{ animationDelay: "-10s" }}
+        />
         {children}
-        <Toaster position="top-right" richColors />
-        <Analytics />
       </body>
     </html>
   )

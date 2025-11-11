@@ -1,9 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
-  reactStrictMode: true,
-  poweredByHeader: false,
-  compress: true,
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -11,18 +7,8 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**',
-      },
-      {
-        protocol: 'http',
-        hostname: '**',
-      },
-    ],
     unoptimized: true,
   },
-};
+}
 
-export default nextConfig;
+export default nextConfig

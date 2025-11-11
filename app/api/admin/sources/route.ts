@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { verifyToken } from "@/lib/security"
 import { cookies } from "next/headers"
-import crypto from "crypto"
+import { deleteCachedData } from "@/lib/redis"
 
 async function verifyAdmin(req: NextRequest): Promise<boolean> {
   const cookieStore = await cookies()
@@ -20,10 +20,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const keys = await db.getAllKeys()
-    return NextResponse.json({ keys })
+    const sources = await db.getAllSources()
+    return NextResponse.json({ sources })
   } catch (error) {
-    console.error("[v0] Get keys error:", error)
+    console.error("[v0] Get sources error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
@@ -34,15 +34,16 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { expiresAt, maxConnections } = await req.json()
+    const { name, url } = await req.json()
 
-    const key = crypto.randomBytes(16).toString("hex")
+    const source = await db.createSource(name, url)
 
-    const newKey = await db.createKey(key, expiresAt ? new Date(expiresAt) : null, maxConnections || 1)
+    // Clear channels cache
+    await deleteCachedData("channels:all")
 
-    return NextResponse.json({ key: newKey })
+    return NextResponse.json({ source })
   } catch (error) {
-    console.error("[v0] Create key error:", error)
+    console.error("[v0] Create source error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
@@ -54,17 +55,20 @@ export async function DELETE(req: NextRequest) {
 
   try {
     const { searchParams } = new URL(req.url)
-    const keyId = searchParams.get("id")
+    const sourceId = searchParams.get("id")
 
-    if (!keyId) {
-      return NextResponse.json({ error: "Key ID required" }, { status: 400 })
+    if (!sourceId) {
+      return NextResponse.json({ error: "Source ID required" }, { status: 400 })
     }
 
-    await db.deleteKey(Number.parseInt(keyId))
+    await db.deleteSource(Number.parseInt(sourceId))
+
+    // Clear channels cache
+    await deleteCachedData("channels:all")
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("[v0] Delete key error:", error)
+    console.error("[v0] Delete source error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

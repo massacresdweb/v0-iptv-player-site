@@ -1,75 +1,93 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getDb } from "@/lib/db"
-import { getCache, setCache } from "@/lib/redis"
-import { parseM3U } from "@/lib/m3u-parser"
-import { decrypt } from "@/lib/encryption"
+import { db } from "@/lib/db"
+import { getCachedData, setCachedData } from "@/lib/redis"
+import { verifyToken } from "@/lib/security"
+import { cookies } from "next/headers"
 
-export async function GET(request: NextRequest) {
+interface Channel {
+  id: string
+  name: string
+  logo: string
+  category: string
+  url: string
+}
+
+async function parseM3U(url: string): Promise<Channel[]> {
+  const response = await fetch(url)
+  const content = await response.text()
+
+  const channels: Channel[] = []
+  const lines = content.split("\n")
+
+  let currentChannel: Partial<Channel> = {}
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim()
+
+    if (line.startsWith("#EXTINF:")) {
+      const nameMatch = line.match(/,(.+)$/)
+      const logoMatch = line.match(/tvg-logo="([^"]+)"/)
+      const groupMatch = line.match(/group-title="([^"]+)"/)
+
+      currentChannel = {
+        id: crypto.randomUUID(),
+        name: nameMatch ? nameMatch[1].trim() : "Unknown",
+        logo: logoMatch ? logoMatch[1] : "/placeholder.svg?height=40&width=40",
+        category: groupMatch ? groupMatch[1] : "Other",
+      }
+    } else if (line && !line.startsWith("#") && currentChannel.name) {
+      currentChannel.url = line
+      channels.push(currentChannel as Channel)
+      currentChannel = {}
+    }
+  }
+
+  return channels
+}
+
+export async function GET(req: NextRequest) {
   try {
-    const sessionToken = request.cookies.get("session_token")?.value
+    // Verify session
+    const cookieStore = await cookies()
+    const token = cookieStore.get("session_token")
 
-    if (!sessionToken) {
+    if (!token || !verifyToken(token.value)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get session from cache or DB
-    const cacheKey = `session:${sessionToken}`
-    let session = await getCache(cacheKey)
+    // Check cache
+    const cacheKey = "channels:all"
+    const cached = await getCachedData<Channel[]>(cacheKey)
 
-    if (!session) {
-      const db = await getDb()
-      const result = await db.execute(
-        "SELECT * FROM active_sessions WHERE session_token = ? AND expires_at > NOW() AND is_active = true",
-        [sessionToken],
-      )
+    if (cached) {
+      return NextResponse.json({ channels: cached })
+    }
 
-      if (result.rows.length === 0) {
-        return NextResponse.json({ error: "Invalid session" }, { status: 401 })
+    // Get M3U sources from database
+    const sources = await db.getAllSources()
+
+    if (sources.length === 0) {
+      return NextResponse.json({ channels: [] })
+    }
+
+    // Parse all M3U sources and combine channels
+    const allChannels: Channel[] = []
+
+    for (const source of sources) {
+      try {
+        const channels = await parseM3U(source.url)
+        allChannels.push(...channels)
+      } catch (error) {
+        console.error(`[v0] Failed to parse M3U from ${source.name}:`, error)
       }
-
-      session = result.rows[0]
-      await setCache(cacheKey, session, 300)
     }
 
-    // Check if KEY is banned
-    const db = await getDb()
-    const keyResult = await db.execute("SELECT is_banned, expires_at FROM user_keys WHERE key_value = ?", [
-      session.key_value,
-    ])
+    // Cache for 5 minutes
+    await setCachedData(cacheKey, allChannels, 300)
 
-    if (keyResult.rows.length === 0 || keyResult.rows[0].is_banned) {
-      return NextResponse.json({ error: "KEY banned or invalid" }, { status: 403 })
-    }
-
-    // Check if KEY expired
-    const expiresAt = new Date(keyResult.rows[0].expires_at as string)
-    if (expiresAt < new Date()) {
-      return NextResponse.json({ error: "KEY expired" }, { status: 403 })
-    }
-
-    // Get channels from cache
-    const channelsCacheKey = `channels:${session.m3u_source_id}`
-    let channels = await getCache(channelsCacheKey)
-
-    if (!channels) {
-      // Get M3U source
-      const m3uResult = await db.execute("SELECT encrypted_url FROM m3u_sources WHERE id = ?", [session.m3u_source_id])
-
-      if (m3uResult.rows.length === 0) {
-        return NextResponse.json({ error: "M3U not found" }, { status: 404 })
-      }
-
-      // Decrypt and parse M3U
-      const m3uUrl = decrypt(m3uResult.rows[0].encrypted_url as string)
-      channels = await parseM3U(m3uUrl)
-
-      // Cache for 1 hour
-      await setCache(channelsCacheKey, channels, 3600)
-    }
-
-    return NextResponse.json({ channels, cached: !!channels })
+    return NextResponse.json({ channels: allChannels })
   } catch (error) {
-    console.error("[v0] Get channels error:", error)
+    console.error("[v0] Channels API error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
