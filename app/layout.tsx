@@ -18,14 +18,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className="font-sans antialiased">
-        <div className="floating-orb w-[500px] h-[500px] bg-primary top-[10%] left-[5%]" />
-        <div
-          className="floating-orb w-[400px] h-[400px] bg-accent top-[60%] right-[10%]"
-          style={{ animationDelay: "-10s" }}
-        />
-        {children}
-      </body>
+      <body className="font-sans antialiased min-h-screen bg-black">{children}</body>
     </html>
   )
 }

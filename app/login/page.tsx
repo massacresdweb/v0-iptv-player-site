@@ -3,9 +3,7 @@
 import type React from "react"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Logo } from "@/components/logo"
+import Logo from "@/components/logo"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -66,36 +64,36 @@ export default function LoginPage() {
           {/* Form */}
           <form onSubmit={handleLogin} className="space-y-6">
             <div>
-              <Input
+              <input
                 type="text"
                 placeholder="Enter Your Access Key"
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
-                className="luxury-input w-full bg-white/5 border-white/20 text-white placeholder:text-gray-500 h-14 text-lg"
+                className="luxury-input w-full bg-white/5 border border-white/20 text-white placeholder:text-gray-500 h-14 text-lg rounded-xl px-4"
                 disabled={loading}
               />
             </div>
 
             {error && (
-              <div className="text-red-400 text-sm text-center bg-red-500/10 border border-red-500/20 rounded-lg p-3 animate-shake">
+              <div className="text-red-400 text-sm text-center bg-red-500/10 border border-red-500/20 rounded-lg p-3">
                 {error}
               </div>
             )}
 
-            <Button
+            <button
               type="submit"
               disabled={loading || !key}
-              className="luxury-button w-full h-14 text-base font-semibold rounded-xl"
+              className="luxury-button w-full h-14 text-base font-semibold rounded-xl text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
-                <span className="flex items-center gap-2">
+                <span className="flex items-center justify-center gap-2">
                   <span className="animate-spin">⚡</span>
                   Verifying...
                 </span>
               ) : (
                 "Access Platform"
               )}
-            </Button>
+            </button>
           </form>
 
           <div className="mt-8 pt-6 border-t border-white/10 text-center">

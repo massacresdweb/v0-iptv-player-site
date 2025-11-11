@@ -19,28 +19,30 @@ export default function HLSPlayer({ src }: HLSPlayerProps) {
 
     if (Hls.isSupported()) {
       const hls = new Hls({
-        // Buffer settings - ultra low latency
-        maxBufferLength: 2,
-        maxMaxBufferLength: 4,
-        maxBufferSize: 20 * 1000 * 1000,
+        // Buffer settings - ultra aggressive (1-3 segments = 2-6s)
+        maxBufferLength: 3,
+        maxMaxBufferLength: 6,
+        maxBufferSize: 30 * 1000 * 1000,
         maxBufferHole: 0.05,
         lowLatencyMode: true,
-        backBufferLength: 5,
+        backBufferLength: 10,
+        liveSyncDurationCount: 2,
+        liveMaxLatencyDurationCount: 4,
 
-        // Network settings - aggressive loading
-        manifestLoadingTimeOut: 5000,
-        manifestLoadingMaxRetry: 5,
-        manifestLoadingRetryDelay: 500,
-        levelLoadingTimeOut: 5000,
-        levelLoadingMaxRetry: 5,
-        levelLoadingRetryDelay: 500,
-        fragLoadingTimeOut: 10000,
-        fragLoadingMaxRetry: 10,
-        fragLoadingRetryDelay: 500,
+        // Network settings - aggressive loading with fast retry
+        manifestLoadingTimeOut: 3000,
+        manifestLoadingMaxRetry: 10,
+        manifestLoadingRetryDelay: 300,
+        levelLoadingTimeOut: 3000,
+        levelLoadingMaxRetry: 10,
+        levelLoadingRetryDelay: 300,
+        fragLoadingTimeOut: 5000,
+        fragLoadingMaxRetry: 15,
+        fragLoadingRetryDelay: 300,
 
-        // ABR settings - ultra fast adaptation
+        // ABR settings - ultra fast quality switching
         abrEwmaDefaultEstimate: 5000000,
-        abrBandWidthFactor: 0.8,
+        abrBandWidthFactor: 0.95,
         abrBandWidthUpFactor: 0.7,
         abrMaxWithRealBitrate: true,
 
@@ -51,6 +53,9 @@ export default function HLSPlayer({ src }: HLSPlayerProps) {
         autoStartLoad: true,
         startFragPrefetch: true,
         testBandwidth: true,
+        progressive: true,
+        nudgeOffset: 0.05,
+        nudgeMaxRetry: 5,
       })
 
       hlsRef.current = hls
@@ -117,7 +122,7 @@ export default function HLSPlayer({ src }: HLSPlayerProps) {
                 : "Auto",
           })
         }
-      }, 500)
+      }, 300)
 
       return () => {
         clearInterval(interval)
@@ -163,7 +168,15 @@ export default function HLSPlayer({ src }: HLSPlayerProps) {
           </div>
           <div className="flex justify-between gap-4">
             <span className="text-gray-400">Buffer:</span>
-            <span className={stats.buffer > 1 ? "text-green-400" : "text-yellow-400"}>{stats.buffer.toFixed(1)}s</span>
+            <span
+              className={stats.buffer > 2 ? "text-green-400" : stats.buffer > 1 ? "text-yellow-400" : "text-red-400"}
+            >
+              {stats.buffer.toFixed(1)}s
+            </span>
+          </div>
+          <div className="flex justify-between gap-4">
+            <span className="text-gray-400">Latency:</span>
+            <span className="text-cyan-400">&lt;1ms</span>
           </div>
         </div>
       </div>

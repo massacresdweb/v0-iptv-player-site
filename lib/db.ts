@@ -11,6 +11,12 @@ const getDatabaseUrl = () => {
 
 const sql = neon(getDatabaseUrl()!)
 
+export function getDB() {
+  return {
+    query: sql,
+  }
+}
+
 export const db = {
   query: sql,
 

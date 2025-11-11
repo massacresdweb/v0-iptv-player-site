@@ -1,4 +1,4 @@
-export function Logo({
+export default function Logo({
   className = "",
   size = "default",
 }: { className?: string; size?: "small" | "default" | "large" }) {

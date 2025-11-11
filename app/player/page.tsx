@@ -4,8 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import MultiPlayerSwitcher from "@/components/multi-player-switcher"
 import ChannelList from "@/components/channel-list"
-import { Button } from "@/components/ui/button"
-import { Logo } from "@/components/logo"
+import Logo from "@/components/logo"
 
 interface Channel {
   id: string
@@ -90,16 +89,15 @@ export default function PlayerPage() {
       <header className="glass-card border-b border-white/10 sticky top-0 z-50 backdrop-blur-xl">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <Logo size="small" />
-          <Button
-            variant="ghost"
+          <button
             onClick={() => {
               fetch("/api/session", { method: "DELETE" })
               router.push("/login")
             }}
-            className="text-gray-400 hover:text-white transition-all hover:scale-105"
+            className="px-4 py-2 text-gray-400 hover:text-white transition-all hover:scale-105 rounded-lg hover:bg-white/5"
           >
             Sign Out
-          </Button>
+          </button>
         </div>
       </header>
 

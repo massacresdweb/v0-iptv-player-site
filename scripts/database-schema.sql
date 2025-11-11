@@ -126,6 +126,24 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
 
 CREATE INDEX IF NOT EXISTS idx_admin_sessions_token ON admin_sessions(session_token);
 
+-- Load Balancer Servers table
+CREATE TABLE IF NOT EXISTS load_balancer_servers (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    url TEXT NOT NULL,
+    weight INTEGER DEFAULT 1,
+    enabled BOOLEAN DEFAULT true,
+    latency FLOAT DEFAULT 0,
+    success_count INTEGER DEFAULT 0,
+    fail_count INTEGER DEFAULT 0,
+    last_check TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_lb_servers_enabled ON load_balancer_servers(enabled);
+CREATE INDEX IF NOT EXISTS idx_lb_servers_weight ON load_balancer_servers(weight);
+
 -- Insert default admin (password will be set by install script)
 INSERT INTO admins (username, password, email) 
 VALUES ('admin', 'changeme', 'admin@masstv.local')
